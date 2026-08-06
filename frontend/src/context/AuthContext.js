@@ -1,7 +1,12 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+// When the app is served by the same server (backend/public), use relative path.
+// When running in dev mode (React on :3000, backend on :5000), use absolute.
+const DEV_MODE = window.location.port === '3000';
+const API_URL = DEV_MODE
+  ? (process.env.REACT_APP_API_URL || 'http://localhost:5000/api')
+  : '/api';
 
 const AuthContext = createContext(null);
 
