@@ -4,9 +4,7 @@ services:
     env: node
     region: singapore
     plan: free
-    buildCommand: |
-      cd frontend && npm install && npm run build && cp -r build ../backend/public
-      cd ../backend && npm install
+    buildCommand: ./render-build.sh
     startCommand: cd backend && node src/server.js
     healthCheckPath: /api/health
     envVars:
