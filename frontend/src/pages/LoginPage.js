@@ -102,12 +102,6 @@ export default function LoginPage() {
             Forgot password?
           </Link>
         </div>
-
-        <div style={{ marginTop: 32, padding: 16, background: '#F8F9FA', borderRadius: 8, fontSize: 13, color: '#636E72' }}>
-          <strong>Demo Credentials:</strong><br />
-          Admin: owner@soulfulweddings.com / admin123<br />
-          Employee: rahul@soulfulweddings.com / emp123
-        </div>
       </div>
     </div>
   );

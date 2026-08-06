@@ -8,6 +8,7 @@ const http = require('http');
 const path = require('path');
 const { Server } = require('socket.io');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { db, initializeDatabase } = require('./database');
 
 const app = express();
@@ -42,14 +43,15 @@ const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
 if (userCount.count === 0) {
   console.log('Empty database detected — auto-seeding...');
   const adminHash = bcrypt.hashSync('admin123', 10);
-  const empHash = bcrypt.hashSync('emp123', 10);
 
+  // Create admin
   const adminResult = db.prepare(
     `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
   ).run('Studio Owner', '9876543210', 'owner@soulfulweddings.com', adminHash, 'Admin', 'Owner', '2020-01-01', 'Active');
   db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(adminResult.lastInsertRowid, 'Full Access');
 
+  // Create employees with random passwords (admin sets/resets them later)
   const employees = [
     { name: 'Rahul Sharma', phone: '9812345671', email: 'rahul@soulfulweddings.com', roles: 'Photographer', doj: '2021-06-15' },
     { name: 'Aman Singh', phone: '9812345672', email: 'aman@soulfulweddings.com', roles: 'Cinematographer', doj: '2021-08-01' },
@@ -68,10 +70,15 @@ if (userCount.count === 0) {
      VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')`
   );
   for (const emp of employees) {
+    // Each employee gets a unique random password — only admin knows it
+    const randomPass = crypto.randomBytes(4).toString('hex');
+    const empHash = bcrypt.hashSync(randomPass, 10);
     insertEmp.run(emp.name, emp.phone, emp.email, empHash, 'Employee', emp.roles, emp.doj);
   }
 
-  console.log('Auto-seed complete! Admin: owner@soulfulweddings.com / admin123');
+  console.log('Auto-seed complete!');
+  console.log('Admin login: owner@soulfulweddings.com / admin123');
+  console.log('Employees have random passwords. Admin must set them via the Employees page.');
 }
 
 app.use('/api/auth', require('./routes/auth'));
