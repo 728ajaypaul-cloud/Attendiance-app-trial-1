@@ -1,0 +1,30 @@
+services:
+  - type: web
+    name: soulful-weddings-attendance
+    env: node
+    region: singapore
+    plan: free
+    buildCommand: |
+      cd frontend && npm install && npm run build && cp -r build ../backend/public
+      cd ../backend && npm install
+    startCommand: cd backend && node src/server.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20.18.0
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRY
+        value: 30m
+      - key: JWT_REFRESH_EXPIRY
+        value: 7d
+      - key: DB_PATH
+        value: ./data/attendance.db
+      - key: UPLOAD_DIR
+        value: ./uploads
+      - key: SMTP_HOST
+        value: smtp.gmail.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: ADMIN_EMAIL
+        value: owner@soulfulweddings.com

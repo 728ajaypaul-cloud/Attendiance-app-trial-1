@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
-    "seed": "node src/seed.js"
+    "seed": "node src/seed.js",
+    "build": "cd ../frontend && npm install && npm run build && cp -r build ../backend/public"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
