@@ -38,27 +38,18 @@ app.use('/uploads', express.static('uploads'));
 initializeDatabase();
 app.set('io', io);
 
-// Auto-seed if no users exist (fresh deploy)
-const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
-if (userCount.count === 0) {
-  console.log('Empty database detected — auto-seeding...');
-  const adminHash = bcrypt.hashSync('admin123', 10);
+// --- MIGRATION: Replace old employees with new ones ---
+// Check if old employees exist (Rahul, Aman, etc.)
+const oldEmployeeCheck = db.prepare("SELECT COUNT(*) as count FROM users WHERE email IN ('rahul@soulfulweddings.com','aman@soulfulweddings.com','priya@soulfulweddings.com','neha@soulfulweddings.com','arjun@soulfulweddings.com','rohit@soulfulweddings.com','anjali@soulfulweddings.com','deepak@soulfulweddings.com')").get();
+if (oldEmployeeCheck.count > 0) {
+  console.log('Migrating old employees to new employee list...');
+  // Remove old employees (they have no attendance data or we don't care)
+  db.prepare("DELETE FROM users WHERE email IN ('rahul@soulfulweddings.com','aman@soulfulweddings.com','priya@soulfulweddings.com','vikram@soulfulweddings.com','neha@soulfulweddings.com','arjun@soulfulweddings.com','simran@soulfulweddings.com','rohit@soulfulweddings.com','deepak@soulfulweddings.com','anjali@soulfulweddings.com')").run();
+  
+  // Also delete any old Ajay entry to recreate it
+  db.prepare("DELETE FROM users WHERE email = 'ajay@soulfulweddings.com'").run();
+
   const empHash = bcrypt.hashSync('emp123', 10);
-
-  // Create admin
-  const adminResult = db.prepare(
-    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run('Studio Owner', '9876543210', 'owner@soulfulweddings.com', adminHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
-  db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(adminResult.lastInsertRowid, 'Full Access');
-
-  // Also create Ajay as admin
-  const ajayHash = bcrypt.hashSync('ajay123', 10);
-  const ajayResult = db.prepare(
-    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run('Ajay', '9812345681', 'ajay@soulfulweddings.com', ajayHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
-  db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(ajayResult.lastInsertRowid, 'Full Access');
 
   // Create 6 employees
   const employees = [
@@ -75,13 +66,70 @@ if (userCount.count === 0) {
      VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'other')`
   );
   for (const emp of employees) {
-    insertEmp.run(emp.name, emp.phone, emp.email, empHash, 'Employee', emp.roles, emp.doj);
+    try {
+      insertEmp.run(emp.name, emp.phone, emp.email, empHash, 'Employee', emp.roles, emp.doj);
+      console.log('  Created:', emp.name);
+    } catch (e) {
+      console.log('  Skipped (exists):', emp.name);
+    }
   }
 
-  console.log('Auto-seed complete!');
-  console.log('Admin: owner@soulfulweddings.com / admin123');
-  console.log('Admin: ajay@soulfulweddings.com / ajay123');
-  console.log('Employees all use password: emp123');
+  // Make sure Ajay admin exists
+  const ajayCheck = db.prepare("SELECT id FROM users WHERE email = 'ajay@soulfulweddings.com'").get();
+  if (!ajayCheck) {
+    const ajayHash = bcrypt.hashSync('ajay123', 10);
+    const ajayResult = db.prepare(
+      `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('Ajay', '9812345681', 'ajay@soulfulweddings.com', ajayHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
+    db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(ajayResult.lastInsertRowid, 'Full Access');
+    console.log('  Created admin: Ajay');
+  }
+
+  console.log('Migration complete!');
+} else {
+  // Auto-seed if no users exist at all (fresh deploy)
+  const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
+  if (userCount.count === 0) {
+    console.log('Empty database detected — auto-seeding...');
+    const adminHash = bcrypt.hashSync('admin123', 10);
+    const empHash = bcrypt.hashSync('emp123', 10);
+
+    const adminResult = db.prepare(
+      `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('Studio Owner', '9876543210', 'owner@soulfulweddings.com', adminHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
+    db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(adminResult.lastInsertRowid, 'Full Access');
+
+    const ajayHash = bcrypt.hashSync('ajay123', 10);
+    const ajayResult = db.prepare(
+      `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+    ).run('Ajay', '9812345681', 'ajay@soulfulweddings.com', ajayHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
+    db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(ajayResult.lastInsertRowid, 'Full Access');
+
+    const employees = [
+      { name: 'Nonu', phone: '9812345671', email: 'nonu@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+      { name: 'Sahil', phone: '9812345672', email: 'sahil@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+      { name: 'Junior', phone: '9812345673', email: 'junior@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+      { name: 'Rohit', phone: '9812345674', email: 'rohit1@soulfulweddings.com', roles: 'Photographer', doj: '2024-01-01' },
+      { name: 'Vikas', phone: '9812345675', email: 'vikas@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+      { name: 'Ajay Kumar', phone: '9812345676', email: 'ajayk@soulfulweddings.com', roles: 'Photographer', doj: '2024-01-01' },
+    ];
+
+    const insertEmp = db.prepare(
+      `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+       VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'other')`
+    );
+    for (const emp of employees) {
+      insertEmp.run(emp.name, emp.phone, emp.email, empHash, 'Employee', emp.roles, emp.doj);
+    }
+
+    console.log('Auto-seed complete!');
+    console.log('Admin: owner@soulfulweddings.com / admin123');
+    console.log('Admin: ajay@soulfulweddings.com / ajay123');
+    console.log('Employees all use password: emp123');
+  }
 }
 
 app.use('/api/auth', require('./routes/auth'));
@@ -98,7 +146,6 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
 });
 
-// Serve React frontend in production
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 app.get('*', (req, res) => {
