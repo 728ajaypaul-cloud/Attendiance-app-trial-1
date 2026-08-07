@@ -43,42 +43,45 @@ const userCount = db.prepare('SELECT COUNT(*) as count FROM users').get();
 if (userCount.count === 0) {
   console.log('Empty database detected — auto-seeding...');
   const adminHash = bcrypt.hashSync('admin123', 10);
+  const empHash = bcrypt.hashSync('emp123', 10);
 
   // Create admin
   const adminResult = db.prepare(
-    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
-  ).run('Studio Owner', '9876543210', 'owner@soulfulweddings.com', adminHash, 'Admin', 'Owner', '2020-01-01', 'Active');
+    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run('Studio Owner', '9876543210', 'owner@soulfulweddings.com', adminHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
   db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(adminResult.lastInsertRowid, 'Full Access');
 
-  // Create employees with random passwords (admin sets/resets them later)
+  // Also create Ajay as admin
+  const ajayHash = bcrypt.hashSync('ajay123', 10);
+  const ajayResult = db.prepare(
+    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`
+  ).run('Ajay', '9812345681', 'ajay@soulfulweddings.com', ajayHash, 'Admin', 'Owner', '2020-01-01', 'Active', 'other');
+  db.prepare('INSERT OR IGNORE INTO admins (user_id, permission_level) VALUES (?, ?)').run(ajayResult.lastInsertRowid, 'Full Access');
+
+  // Create 6 employees
   const employees = [
-    { name: 'Rahul Sharma', phone: '9812345671', email: 'rahul@soulfulweddings.com', roles: 'Photographer', doj: '2021-06-15' },
-    { name: 'Aman Singh', phone: '9812345672', email: 'aman@soulfulweddings.com', roles: 'Cinematographer', doj: '2021-08-01' },
-    { name: 'Priya Gupta', phone: '9812345673', email: 'priya@soulfulweddings.com', roles: 'Editor', doj: '2022-01-10' },
-    { name: 'Vikram Joshi', phone: '9812345674', email: 'vikram@soulfulweddings.com', roles: 'Drone Pilot', doj: '2022-03-20' },
-    { name: 'Neha Kapoor', phone: '9812345675', email: 'neha@soulfulweddings.com', roles: 'Album Designer', doj: '2022-07-05' },
-    { name: 'Arjun Verma', phone: '9812345676', email: 'arjun@soulfulweddings.com', roles: 'Assistant', doj: '2023-02-14' },
-    { name: 'Simran Kaur', phone: '9812345677', email: 'simran@soulfulweddings.com', roles: 'Cinematographer + Drone Pilot', doj: '2023-05-01' },
-    { name: 'Rohit Malhotra', phone: '9812345678', email: 'rohit@soulfulweddings.com', roles: 'Freelancer', doj: '2024-01-15' },
-    { name: 'Deepak Kumar', phone: '9812345679', email: 'deepak@soulfulweddings.com', roles: 'Photographer', doj: '2022-11-01' },
-    { name: 'Anjali Mehta', phone: '9812345680', email: 'anjali@soulfulweddings.com', roles: 'Editor', doj: '2023-09-10' },
+    { name: 'Nonu', phone: '9812345671', email: 'nonu@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+    { name: 'Sahil', phone: '9812345672', email: 'sahil@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+    { name: 'Junior', phone: '9812345673', email: 'junior@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+    { name: 'Rohit', phone: '9812345674', email: 'rohit1@soulfulweddings.com', roles: 'Photographer', doj: '2024-01-01' },
+    { name: 'Vikas', phone: '9812345675', email: 'vikas@soulfulweddings.com', roles: 'Editor', doj: '2024-01-01' },
+    { name: 'Ajay Kumar', phone: '9812345676', email: 'ajayk@soulfulweddings.com', roles: 'Photographer', doj: '2024-01-01' },
   ];
 
   const insertEmp = db.prepare(
-    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 'Active')`
+    `INSERT INTO users (full_name, phone, email, password_hash, role, roles, date_of_joining, status, employee_type)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 'Active', 'other')`
   );
   for (const emp of employees) {
-    // Each employee gets a unique random password — only admin knows it
-    const randomPass = crypto.randomBytes(4).toString('hex');
-    const empHash = bcrypt.hashSync(randomPass, 10);
     insertEmp.run(emp.name, emp.phone, emp.email, empHash, 'Employee', emp.roles, emp.doj);
   }
 
   console.log('Auto-seed complete!');
-  console.log('Admin login: owner@soulfulweddings.com / admin123');
-  console.log('Employees have random passwords. Admin must set them via the Employees page.');
+  console.log('Admin: owner@soulfulweddings.com / admin123');
+  console.log('Admin: ajay@soulfulweddings.com / ajay123');
+  console.log('Employees all use password: emp123');
 }
 
 app.use('/api/auth', require('./routes/auth'));
@@ -99,7 +102,6 @@ app.get('/api/health', (req, res) => {
 const publicPath = path.join(__dirname, '..', 'public');
 app.use(express.static(publicPath));
 app.get('*', (req, res) => {
-  // Only serve index.html for non-API routes
   if (!req.path.startsWith('/api')) {
     res.sendFile(path.join(publicPath, 'index.html'));
   }
