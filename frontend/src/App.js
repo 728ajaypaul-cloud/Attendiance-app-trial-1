@@ -11,6 +11,7 @@ import AdminReports from './pages/AdminReports';
 import AdminEmployees from './pages/AdminEmployees';
 import AdminSettings from './pages/AdminSettings';
 import AdminQR from './pages/AdminQR';
+import QRScanner from './pages/QRScanner';
 import Navbar from './components/Navbar';
 import './styles/App.css';
 
@@ -65,6 +66,9 @@ function AppRoutes() {
         } />
         <Route path="/admin/settings" element={
           <ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>
+        } />
+        <Route path="/qr-scanner" element={
+          <ProtectedRoute><QRScanner /></ProtectedRoute>
         } />
         <Route path="/admin/qr" element={
           <ProtectedRoute adminOnly><AdminQR /></ProtectedRoute>
