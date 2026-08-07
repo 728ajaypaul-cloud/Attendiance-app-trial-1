@@ -151,12 +151,12 @@ function initializeDatabase() {
 
   // Add employee_type column if missing (for existing databases)
   try {
-    db.exec(`ALTER TABLE users ADD COLUMN employee_type TEXT DEFAULT 'other' CHECK(employee_type IN ('in-house-editor', 'home-editor', 'other'))`);
+    db.exec(`ALTER TABLE users ADD COLUMN employee_type TEXT DEFAULT 'other'`);
   } catch (e) {
     // Column already exists - ignore
   }
   try {
-    db.exec(`ALTER TABLE attendance ADD COLUMN check_in_method TEXT DEFAULT 'manual' CHECK(check_in_method IN ('manual', 'qr-code'))`);
+    db.exec(`ALTER TABLE attendance ADD COLUMN check_in_method TEXT DEFAULT 'manual'`);
   } catch (e) {
     // Column already exists - ignore
   }
