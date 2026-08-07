@@ -10,6 +10,7 @@ import AdminCalendar from './pages/AdminCalendar';
 import AdminReports from './pages/AdminReports';
 import AdminEmployees from './pages/AdminEmployees';
 import AdminSettings from './pages/AdminSettings';
+import AdminQR from './pages/AdminQR';
 import Navbar from './components/Navbar';
 import './styles/App.css';
 
@@ -64,6 +65,9 @@ function AppRoutes() {
         } />
         <Route path="/admin/settings" element={
           <ProtectedRoute adminOnly><AdminSettings /></ProtectedRoute>
+        } />
+        <Route path="/admin/qr" element={
+          <ProtectedRoute adminOnly><AdminQR /></ProtectedRoute>
         } />
         <Route path="*" element={<Navigate to="/" />} />
       </Routes>

@@ -26,6 +26,7 @@ function initializeDatabase() {
       password_hash TEXT NOT NULL,
       role TEXT NOT NULL DEFAULT 'Employee',
       roles TEXT DEFAULT 'Photographer',
+      employee_type TEXT DEFAULT 'other' CHECK(employee_type IN ('in-house-editor', 'home-editor', 'other')),
       date_of_joining TEXT,
       status TEXT DEFAULT 'Active' CHECK(status IN ('Active', 'Inactive')),
       profile_picture TEXT,
@@ -49,6 +50,7 @@ function initializeDatabase() {
       date TEXT NOT NULL,
       check_in_time TEXT,
       check_out_time TEXT,
+      check_in_method TEXT DEFAULT 'manual' CHECK(check_in_method IN ('manual', 'qr-code')),
       check_in_gps_lat REAL,
       check_in_gps_lng REAL,
       check_out_gps_lat REAL,
@@ -62,6 +64,21 @@ function initializeDatabase() {
       updated_at TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
       FOREIGN KEY (override_by) REFERENCES users(id) ON DELETE SET NULL
+    );
+
+    -- QR code sessions (for in-house editor QR check-in)
+    CREATE TABLE IF NOT EXISTS qr_sessions (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      user_id INTEGER NOT NULL,
+      token TEXT UNIQUE NOT NULL,
+      action TEXT NOT NULL CHECK(action IN ('checkin', 'checkout')),
+      wifi_ssid TEXT NOT NULL,
+      wifi_bssid TEXT,
+      scanned_at TEXT,
+      expires_at TEXT NOT NULL,
+      used INTEGER DEFAULT 0,
+      created_at TEXT DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
 
     -- Leave records
@@ -128,7 +145,21 @@ function initializeDatabase() {
     CREATE INDEX IF NOT EXISTS idx_audit_log_created ON audit_log(created_at);
     CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id);
     CREATE INDEX IF NOT EXISTS idx_sessions_token ON sessions(token);
+    CREATE INDEX IF NOT EXISTS idx_qr_sessions_token ON qr_sessions(token);
+    CREATE INDEX IF NOT EXISTS idx_qr_sessions_user ON qr_sessions(user_id);
   `);
+
+  // Add employee_type column if missing (for existing databases)
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN employee_type TEXT DEFAULT 'other' CHECK(employee_type IN ('in-house-editor', 'home-editor', 'other'))`);
+  } catch (e) {
+    // Column already exists - ignore
+  }
+  try {
+    db.exec(`ALTER TABLE attendance ADD COLUMN check_in_method TEXT DEFAULT 'manual' CHECK(check_in_method IN ('manual', 'qr-code'))`);
+  } catch (e) {
+    // Column already exists - ignore
+  }
 
   // Insert default settings if not exist
   const defaultSettings = [
@@ -142,6 +173,7 @@ function initializeDatabase() {
     ['gps_radius_meters', '100'],
     ['gps_enabled', 'false'],
     ['auto_late_after_minutes', '30'],
+    ['office_wifi_ssid', 'Soulful weddings 5G'],
   ];
 
   const insertSetting = db.prepare('INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)');

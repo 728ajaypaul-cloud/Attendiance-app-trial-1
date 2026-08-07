@@ -55,6 +55,22 @@ export default function AdminDashboard() {
     return map[status] || '❓';
   };
 
+  const getEmployeeTypeLabel = (type) => {
+    const map = {
+      'in-house-editor': '🏢 In-house Editor',
+      'home-editor': '🏠 Home Editor',
+      'other': '👤 Employee'
+    };
+    return map[type] || type || '👤';
+  };
+
+  const getMethodBadge = (method) => {
+    if (!method) return null;
+    return method === 'qr-code'
+      ? <span className="badge" style={{ background: '#6C63FF', color: '#fff', fontSize: 11 }}>📱 QR</span>
+      : <span className="badge" style={{ background: '#0984E3', color: '#fff', fontSize: 11 }}>✋ Manual</span>;
+  };
+
   const filteredRecords = () => {
     if (!data?.records) return [];
     let list = [...data.records];
@@ -74,6 +90,7 @@ export default function AdminDashboard() {
         case 'time': valA = a.check_in_time || ''; valB = b.check_in_time || ''; break;
         case 'status': valA = a.status || ''; valB = b.status || ''; break;
         case 'role': valA = a.roles || ''; valB = b.roles || ''; break;
+        case 'type': valA = a.employee_type || ''; valB = b.employee_type || ''; break;
         default: valA = a.full_name || ''; valB = b.full_name || '';
       }
       if (sortDir === 'asc') return valA > valB ? 1 : -1;
@@ -153,6 +170,7 @@ export default function AdminDashboard() {
         <button className="btn btn-primary" onClick={() => navigate('/admin/calendar')}>📅 View Calendar</button>
         <button className="btn btn-outline" onClick={() => navigate('/admin/reports')}>📊 Reports</button>
         <button className="btn btn-outline" onClick={() => navigate('/admin/employees')}>👥 Employees</button>
+        <button className="btn btn-outline" onClick={() => navigate('/admin/qr')}>📱 QR Codes</button>
         <button className="btn btn-outline" onClick={() => navigate('/admin/settings')}>⚙️ Settings</button>
       </div>
 
@@ -186,13 +204,18 @@ export default function AdminDashboard() {
               <th onClick={() => handleSort('name')} style={{ cursor: 'pointer' }}>
                 Name {sortField === 'name' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
+              <th onClick={() => handleSort('type')} style={{ cursor: 'pointer' }}>
+                Type {sortField === 'type' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
+              </th>
               <th onClick={() => handleSort('role')} style={{ cursor: 'pointer' }}>
                 Role {sortField === 'role' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
               <th onClick={() => handleSort('time')} style={{ cursor: 'pointer' }}>
                 Check-in {sortField === 'time' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
+              <th>Check-out</th>
               <th>Hours</th>
+              <th>Method</th>
               <th onClick={() => handleSort('status')} style={{ cursor: 'pointer' }}>
                 Status {sortField === 'status' ? (sortDir === 'asc' ? '↑' : '↓') : ''}
               </th>
@@ -203,6 +226,7 @@ export default function AdminDashboard() {
             {filteredRecords().map((r, idx) => (
               <tr key={r.user_id || idx}>
                 <td style={{ fontWeight: 500 }}>{r.full_name}</td>
+                <td><span style={{ fontSize: 13 }}>{getEmployeeTypeLabel(r.employee_type)}</span></td>
                 <td>{r.roles}</td>
                 <td>
                   {r.check_in_time
@@ -210,12 +234,16 @@ export default function AdminDashboard() {
                     : '-'}
                 </td>
                 <td>
-                  {r.check_in_time ? (
-                    r.check_out_time
-                      ? calcHours(r.check_in_time, r.check_out_time)
-                      : <span style={{ color: 'var(--success)', fontWeight: 600 }}>Working</span>
-                  ) : '-'}
+                  {r.check_out_time
+                    ? new Date(r.check_out_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })
+                    : r.check_in_time ? <span style={{ color: 'var(--success)', fontSize: 12 }}>Working</span> : '-'}
                 </td>
+                <td>
+                  {r.check_in_time && r.check_out_time
+                    ? calcHours(r.check_in_time, r.check_out_time)
+                    : '-'}
+                </td>
+                <td>{getMethodBadge(r.check_in_method)}</td>
                 <td>
                   <span className={`badge ${getStatusBadge(r.status)}`}>
                     {getStatusEmoji(r.status)} {r.status}

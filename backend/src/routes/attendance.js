@@ -25,18 +25,15 @@ function calculateStatus(checkInTime, totalHours) {
   const lateThreshold = settings.late_threshold || '09:30';
   const halfDayThreshold = parseFloat(settings.half_day_threshold_hours || '4');
 
-  // Parse check-in time
   const checkInDate = new Date(checkInTime);
   const checkInHours = checkInDate.getHours().toString().padStart(2, '0');
   const checkInMinutes = checkInDate.getMinutes().toString().padStart(2, '0');
   const checkInStr = `${checkInHours}:${checkInMinutes}`;
 
-  // Compare with late threshold
   if (checkInStr > lateThreshold) {
     return 'Late';
   }
 
-  // Check total hours for half day
   if (totalHours !== null && totalHours < halfDayThreshold) {
     return 'Half Day';
   }
@@ -44,7 +41,7 @@ function calculateStatus(checkInTime, totalHours) {
   return 'Present';
 }
 
-// POST /api/attendance/checkin - Employee check-in
+// POST /api/attendance/checkin - Employee manual check-in
 router.post('/checkin', authenticate, (req, res) => {
   try {
     const userId = req.user.id;
@@ -70,20 +67,15 @@ router.post('/checkin', authenticate, (req, res) => {
     ).get(userId, today);
     const sessionNumber = (lastSession?.max_session || 0) + 1;
 
-    // Insert check-in record
+    // Insert check-in record with check_in_method = 'manual'
     const result = db.prepare(
-      `INSERT INTO attendance (user_id, date, check_in_time, check_in_gps_lat, check_in_gps_lng, device_info, session_number, status)
-       VALUES (?, ?, ?, ?, ?, ?, ?, 'Present')`
+      `INSERT INTO attendance (user_id, date, check_in_time, check_in_method, check_in_gps_lat, check_in_gps_lng, device_info, session_number, status)
+       VALUES (?, ?, ?, 'manual', ?, ?, ?, ?, 'Present')`
     ).run(userId, today, serverTime, gps_lat || null, gps_lng || null, device_info || null, sessionNumber);
-
-    // Calculate elapsed time since check-in
-    const elapsed = Date.now() - new Date(serverTime).getTime();
-    const elapsedMinutes = Math.floor(elapsed / 60000);
-    const elapsedSeconds = Math.floor((elapsed % 60000) / 1000);
 
     // Audit log
     db.prepare('INSERT INTO audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)').run(
-      userId, 'CHECK_IN', `Checked in at ${serverTime}`, req.ip
+      userId, 'CHECK_IN', `Manual check-in at ${serverTime}`, req.ip
     );
 
     res.status(201).json({
@@ -93,8 +85,8 @@ router.post('/checkin', authenticate, (req, res) => {
         time: serverTime,
         date: today,
         session: sessionNumber,
-        gps: gps_lat && gps_lng ? { lat: gps_lat, lng: gps_lng } : null,
-        elapsed: `${elapsedMinutes}m ${elapsedSeconds}s`
+        method: 'manual',
+        gps: gps_lat && gps_lng ? { lat: gps_lat, lng: gps_lng } : null
       }
     });
   } catch (err) {
@@ -103,7 +95,7 @@ router.post('/checkin', authenticate, (req, res) => {
   }
 });
 
-// POST /api/attendance/checkout - Employee check-out
+// POST /api/attendance/checkout - Employee manual check-out
 router.post('/checkout', authenticate, (req, res) => {
   try {
     const userId = req.user.id;
@@ -140,7 +132,7 @@ router.post('/checkout', authenticate, (req, res) => {
 
     // Audit log
     db.prepare('INSERT INTO audit_log (user_id, action, details, ip_address) VALUES (?, ?, ?, ?)').run(
-      userId, 'CHECK_OUT', `Checked out at ${serverTime}, worked ${hours}h ${minutes}m ${seconds}s`, req.ip
+      userId, 'CHECK_OUT', `Manual check-out at ${serverTime}, worked ${hours}h ${minutes}m ${seconds}s`, req.ip
     );
 
     res.json({
@@ -152,6 +144,7 @@ router.post('/checkout', authenticate, (req, res) => {
         duration: `${hours}h ${minutes}m ${seconds}s`,
         totalHours: totalHours.toFixed(2),
         status,
+        method: 'manual',
         gps: gps_lat && gps_lng ? { lat: gps_lat, lng: gps_lng } : null
       }
     });
@@ -188,7 +181,8 @@ router.get('/status', authenticate, (req, res) => {
         checkInTime: r.check_in_time,
         checkOutTime: r.check_out_time,
         status: r.status,
-        sessionNumber: r.session_number
+        sessionNumber: r.session_number,
+        checkInMethod: r.check_in_method
       })),
       isCheckedIn: !!activeSession,
       checkedInToday: records.length > 0
@@ -205,7 +199,7 @@ router.get('/today', authenticate, requireAdmin, (req, res) => {
     const today = getTodayDate();
 
     const records = db.prepare(`
-      SELECT a.*, u.full_name, u.roles, u.email, u.phone
+      SELECT a.*, u.full_name, u.roles, u.email, u.phone, u.employee_type
       FROM attendance a
       JOIN users u ON a.user_id = u.id
       WHERE a.date = ?
@@ -213,7 +207,7 @@ router.get('/today', authenticate, requireAdmin, (req, res) => {
     `).all(today);
 
     // Also get users who haven't checked in
-    const allActiveUsers = db.prepare("SELECT id, full_name, roles FROM users WHERE status = 'Active'").all();
+    const allActiveUsers = db.prepare("SELECT id, full_name, roles, employee_type FROM users WHERE status = 'Active'").all();
     const checkedInUserIds = new Set(records.map(r => r.user_id));
 
     const notCheckedIn = allActiveUsers
@@ -222,9 +216,11 @@ router.get('/today', authenticate, requireAdmin, (req, res) => {
         user_id: u.id,
         full_name: u.full_name,
         roles: u.roles,
+        employee_type: u.employee_type,
         status: 'Absent',
         check_in_time: null,
-        check_out_time: null
+        check_out_time: null,
+        check_in_method: null
       }));
 
     res.json({
@@ -244,7 +240,7 @@ router.get('/today', authenticate, requireAdmin, (req, res) => {
 router.get('/date/:date', authenticate, requireAdmin, (req, res) => {
   try {
     const records = db.prepare(`
-      SELECT a.*, u.full_name, u.roles, u.email
+      SELECT a.*, u.full_name, u.roles, u.email, u.employee_type
       FROM attendance a
       JOIN users u ON a.user_id = u.id
       WHERE a.date = ?
@@ -261,7 +257,6 @@ router.get('/date/:date', authenticate, requireAdmin, (req, res) => {
 // GET /api/attendance/user/:userId - Get attendance for a specific user
 router.get('/user/:userId', authenticate, (req, res) => {
   try {
-    // Employee can view own, admin can view any
     if (req.user.role !== 'Admin' && req.user.id != req.params.userId) {
       return res.status(403).json({ error: 'Access denied' });
     }
@@ -304,6 +299,7 @@ router.get('/user/:userId', authenticate, (req, res) => {
         id: r.id,
         checkInTime: r.check_in_time,
         checkOutTime: r.check_out_time,
+        checkInMethod: r.check_in_method,
         duration: r.check_in_time && r.check_out_time
           ? calculateDuration(r.check_in_time, r.check_out_time)
           : null,
@@ -346,8 +342,8 @@ router.post('/override', authenticate, requireAdmin, (req, res) => {
 
     if (action === 'checkin') {
       const result = db.prepare(
-        `INSERT INTO attendance (user_id, date, check_in_time, override_reason, override_by, status)
-         VALUES (?, ?, ?, ?, ?, 'Present')`
+        `INSERT INTO attendance (user_id, date, check_in_time, check_in_method, override_reason, override_by, status)
+         VALUES (?, ?, ?, 'manual', ?, ?, 'Present')`
       ).run(user_id, targetDate, check_in_time || serverTime, reason, req.user.id);
 
       db.prepare('INSERT INTO audit_log (user_id, action, details) VALUES (?, ?, ?)').run(
@@ -376,18 +372,13 @@ router.post('/override', authenticate, requireAdmin, (req, res) => {
       );
 
       res.json({ message: 'Manual check-out recorded' });
-    } else if (action === 'mark_present' || action === 'mark_absent' || action === 'mark_late' || action === 'mark_halfday') {
-      const statusMap = {
-        mark_present: 'Present',
-        mark_absent: 'Absent',
-        mark_late: 'Late',
-        mark_halfday: 'Half Day'
-      };
+    } else if (['mark_present','mark_absent','mark_late','mark_halfday'].includes(action)) {
+      const statusMap = { mark_present: 'Present', mark_absent: 'Absent', mark_late: 'Late', mark_halfday: 'Half Day' };
 
       const existing = db.prepare('SELECT id FROM attendance WHERE user_id = ? AND date = ?').get(user_id, targetDate);
       if (existing) {
         db.prepare(
-          'UPDATE attendance SET status = ?, override_reason = ?, override_by = ?, updated_at = datetime(\'now\') WHERE id = ?'
+          "UPDATE attendance SET status = ?, override_reason = ?, override_by = ?, updated_at = datetime('now') WHERE id = ?"
         ).run(statusMap[action], reason, req.user.id, existing.id);
       } else {
         db.prepare(
@@ -422,7 +413,6 @@ router.get('/summary/:userId', authenticate, (req, res) => {
     const targetYear = year || new Date().getFullYear();
     const startDate = `${targetYear}-${targetMonth.padStart(2, '0')}-01`;
 
-    // Calculate end of month
     const lastDay = new Date(targetYear, targetMonth, 0).getDate();
     const endDate = `${targetYear}-${targetMonth.padStart(2, '0')}-${lastDay}`;
 
@@ -449,9 +439,8 @@ router.get('/summary/:userId', authenticate, (req, res) => {
         onLeave++;
         dailyRecords[dateStr] = { status: 'On Leave', leaveType: dayLeave.leave_type };
       } else if (dayRecords.length === 0) {
-        // Check if it's a weekend
         const dayOfWeek = new Date(dateStr).getDay();
-        if (dayOfWeek === 0) { // Sunday
+        if (dayOfWeek === 0) {
           dailyRecords[dateStr] = { status: 'Weekend' };
         } else {
           absent++;
@@ -476,6 +465,7 @@ router.get('/summary/:userId', authenticate, (req, res) => {
           sessions: dayRecords.map(r => ({
             checkIn: r.check_in_time,
             checkOut: r.check_out_time,
+            checkInMethod: r.check_in_method,
             duration: r.check_in_time && r.check_out_time ? calculateDuration(r.check_in_time, r.check_out_time) : null
           }))
         };
@@ -489,16 +479,7 @@ router.get('/summary/:userId', authenticate, (req, res) => {
       userId: req.params.userId,
       month: targetMonth,
       year: targetYear,
-      summary: {
-        present,
-        absent,
-        late,
-        halfDay,
-        onLeave,
-        totalDays,
-        totalHours: totalHours.toFixed(1),
-        attendancePercent
-      },
+      summary: { present, absent, late, halfDay, onLeave, totalDays, totalHours: totalHours.toFixed(1), attendancePercent },
       dailyRecords
     });
   } catch (err) {

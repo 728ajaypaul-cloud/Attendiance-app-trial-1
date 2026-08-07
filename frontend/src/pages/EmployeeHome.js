@@ -11,11 +11,27 @@ export default function EmployeeHome() {
   const [actionLoading, setActionLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [wifiSSID, setWifiSSID] = useState('');
+  const [wifiSupported, setWifiSupported] = useState(false);
 
   // Live clock
   useEffect(() => {
     const timer = setInterval(() => setCurrentTime(new Date()), 1000);
     return () => clearInterval(timer);
+  }, []);
+
+  // Detect WiFi (works on HTTPS or localhost, including mobile)
+  useEffect(() => {
+    if (typeof navigator !== 'undefined' && 'connection' in navigator) {
+      const conn = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (conn) {
+        setWifiSSID(conn.ssid || '');
+      }
+    }
+    // Try Network Information API
+    if (typeof navigator !== 'undefined' && navigator.networkInformation) {
+      setWifiSupported(true);
+    }
   }, []);
 
   // Fetch today's status
@@ -44,7 +60,6 @@ export default function EmployeeHome() {
     setActionLoading(true);
     setMessage('');
     try {
-      // Get GPS position if available
       let gps_lat, gps_lng;
       try {
         const pos = await new Promise((resolve, reject) => {
@@ -57,7 +72,6 @@ export default function EmployeeHome() {
         gps_lat = pos.coords.latitude;
         gps_lng = pos.coords.longitude;
       } catch (e) {
-        // GPS not available, proceed without
         console.log('GPS not available:', e.message);
       }
 
@@ -153,6 +167,12 @@ export default function EmployeeHome() {
         <h1 style={{ fontSize: 48, fontWeight: 300, fontVariantNumeric: 'tabular-nums' }}>
           {formatTime(currentTime)}
         </h1>
+        {user?.employee_type && (
+          <span className="badge badge-info" style={{ marginTop: 8 }}>
+            {user.employee_type === 'in-house-editor' ? '🏢 In-house Editor' :
+             user.employee_type === 'home-editor' ? '🏠 Home Editor' : '👤 Employee'}
+          </span>
+        )}
       </div>
 
       {status?.isOnLeave && (
@@ -175,6 +195,11 @@ export default function EmployeeHome() {
               <span className="badge badge-success" style={{ fontSize: 16, padding: '8px 16px' }}>
                 ✅ Checked In at {new Date(status.activeSession.check_in_time).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true })}
               </span>
+              {status.activeSession.check_in_method && (
+                <span className="badge" style={{ marginLeft: 8, background: status.activeSession.check_in_method === 'qr-code' ? '#6C63FF' : '#0984E3', color: '#fff' }}>
+                  {status.activeSession.check_in_method === 'qr-code' ? '📱 QR Scan' : '✋ Manual'}
+                </span>
+              )}
             </div>
             <p style={{ marginTop: 12, color: 'var(--text-secondary)', fontSize: 18, fontVariantNumeric: 'tabular-nums' }}>
               You've worked <strong>{elapsed || getElapsedTime()}</strong>
@@ -222,6 +247,40 @@ export default function EmployeeHome() {
       {message && (
         <div className={`alert alert-${messageType}`} style={{ maxWidth: 400, width: '100%', textAlign: 'center' }}>
           {message}
+        </div>
+      )}
+
+      {/* Today's Sessions */}
+      {status?.sessions?.length > 0 && (
+        <div className="card" style={{ maxWidth: 500, width: '100%', marginTop: 16, padding: 16 }}>
+          <h3 style={{ fontSize: 16, marginBottom: 12 }}>Today's Sessions</h3>
+          {status.sessions.map((session, idx) => (
+            <div key={session.id} style={{
+              display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+              padding: '8px 0', borderBottom: idx < status.sessions.length - 1 ? '1px solid var(--border)' : 'none'
+            }}>
+              <div>
+                <span style={{ fontSize: 13, color: 'var(--text-secondary)' }}>Session {session.sessionNumber}</span>
+                <div style={{ fontSize: 14, marginTop: 2 }}>
+                  {session.checkInTime ? new Date(session.checkInTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : '--'} 
+                  → {session.checkOutTime ? new Date(session.checkOutTime).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Now'}
+                </div>
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                {session.checkInMethod && (
+                  <span className="badge" style={{
+                    background: session.checkInMethod === 'qr-code' ? '#6C63FF' : '#0984E3',
+                    color: '#fff', fontSize: 11, padding: '2px 8px'
+                  }}>
+                    {session.checkInMethod === 'qr-code' ? 'QR' : 'Manual'}
+                  </span>
+                )}
+                <div style={{ fontSize: 13, marginTop: 2, color: 'var(--text-secondary)' }}>
+                  {session.status}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
       )}
 

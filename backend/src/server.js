@@ -89,6 +89,7 @@ app.use('/api/settings', require('./routes/settings'));
 app.use('/api/leaves', require('./routes/leaves'));
 app.use('/api/export', require('./routes/export'));
 app.use('/api/audit', require('./routes/audit'));
+app.use('/api/qr', require('./routes/qr'));
 
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', time: new Date().toISOString() });
