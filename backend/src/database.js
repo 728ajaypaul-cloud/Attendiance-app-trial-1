@@ -46,7 +46,7 @@ function initializeDatabase() {
     -- Attendance records
     CREATE TABLE IF NOT EXISTS attendance (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL DEFAULT 0,
       date TEXT NOT NULL,
       check_in_time TEXT,
       check_out_time TEXT,
@@ -69,7 +69,7 @@ function initializeDatabase() {
     -- QR code sessions (for in-house editor QR check-in)
     CREATE TABLE IF NOT EXISTS qr_sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL DEFAULT 0,
       token TEXT UNIQUE NOT NULL,
       action TEXT NOT NULL CHECK(action IN ('checkin', 'checkout', 'universal')),
       wifi_ssid TEXT NOT NULL,
@@ -84,7 +84,7 @@ function initializeDatabase() {
     -- Leave records
     CREATE TABLE IF NOT EXISTS leaves (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL DEFAULT 0,
       leave_type TEXT CHECK(leave_type IN ('Sick Leave', 'Vacation', 'Personal Leave', 'Unpaid Leave', 'Other')),
       start_date TEXT NOT NULL,
       end_date TEXT NOT NULL,
@@ -117,7 +117,7 @@ function initializeDatabase() {
     -- Session tokens for "remember device"
     CREATE TABLE IF NOT EXISTS sessions (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL DEFAULT 0,
       token TEXT UNIQUE NOT NULL,
       device_info TEXT,
       expires_at TEXT NOT NULL,
@@ -128,7 +128,7 @@ function initializeDatabase() {
     -- Password reset tokens
     CREATE TABLE IF NOT EXISTS password_resets (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      user_id INTEGER NOT NULL,
+      user_id INTEGER NOT NULL DEFAULT 0,
       token TEXT UNIQUE NOT NULL,
       expires_at TEXT NOT NULL,
       used INTEGER DEFAULT 0,

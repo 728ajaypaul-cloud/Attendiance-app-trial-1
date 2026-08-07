@@ -25,7 +25,7 @@ router.post('/generate-universal', authenticate, requireAdmin, (req, res) => {
     // Store as universal QR (user_id = 0 means universal)
     db.prepare(
       'INSERT INTO qr_sessions (user_id, token, action, wifi_ssid, expires_at) VALUES (?, ?, ?, ?, ?)'
-    ).run(0, token, 'checkin', OFFICE_WIFI_SSID, expiresAt);
+    ).run(1, token, 'checkin', OFFICE_WIFI_SSID, expiresAt);
 
     const qrData = JSON.stringify({
       token,
@@ -110,7 +110,7 @@ router.post('/scan', (req, res) => {
     // The scanner app sends the logged-in user's ID
     let targetUserId;
     
-    if (universal || session.user_id === 0) {
+    if (universal || session.user_id === 1) {
       if (!user_id) {
         return res.status(400).json({ error: 'Please login and scan again to identify yourself.' });
       }
