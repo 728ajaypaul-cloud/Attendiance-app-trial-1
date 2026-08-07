@@ -22,7 +22,7 @@ const upload = multer({ storage, limits: { fileSize: 5 * 1024 * 1024 } });
 router.get('/', authenticate, requireAdmin, (req, res) => {
   try {
     const { status, role, search } = req.query;
-    let query = 'SELECT id, full_name, phone, email, role, roles, date_of_joining, status, profile_picture, created_at FROM users WHERE 1=1';
+    let query = 'SELECT id, full_name, phone, email, role, roles, employee_type, date_of_joining, status, profile_picture, created_at FROM users WHERE 1=1';
     const params = [];
 
     if (status) {
@@ -52,7 +52,7 @@ router.get('/', authenticate, requireAdmin, (req, res) => {
 router.get('/me', authenticate, (req, res) => {
   try {
     const employee = db.prepare(
-      'SELECT id, full_name, phone, email, role, roles, date_of_joining, status, profile_picture, created_at FROM users WHERE id = ?'
+      'SELECT id, full_name, phone, email, role, roles, employee_type, date_of_joining, status, profile_picture, created_at FROM users WHERE id = ?'
     ).get(req.user.id);
 
     if (!employee) {
@@ -70,13 +70,12 @@ router.get('/me', authenticate, (req, res) => {
 // GET /api/employees/:id - Get single employee
 router.get('/:id', authenticate, (req, res) => {
   try {
-    // Employee can view own profile, admin can view any
     if (req.user.role !== 'Admin' && req.user.id != req.params.id) {
       return res.status(403).json({ error: 'Access denied' });
     }
 
     const employee = db.prepare(
-      'SELECT id, full_name, phone, email, role, roles, date_of_joining, status, profile_picture, created_at FROM users WHERE id = ?'
+      'SELECT id, full_name, phone, email, role, roles, employee_type, date_of_joining, status, profile_picture, created_at FROM users WHERE id = ?'
     ).get(req.params.id);
 
     if (!employee) {
@@ -93,7 +92,7 @@ router.get('/:id', authenticate, (req, res) => {
 // PUT /api/employees/:id - Update employee (Admin)
 router.put('/:id', authenticate, requireAdmin, (req, res) => {
   try {
-    const { full_name, phone, email, password, role, roles, date_of_joining, status } = req.body;
+    const { full_name, phone, email, password, role, roles, employee_type, date_of_joining, status } = req.body;
 
     const existing = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
     if (!existing) {
@@ -106,6 +105,7 @@ router.put('/:id', authenticate, requireAdmin, (req, res) => {
     if (email !== undefined) updates.email = email;
     if (role !== undefined) updates.role = role;
     if (roles !== undefined) updates.roles = roles;
+    if (employee_type !== undefined) updates.employee_type = employee_type;
     if (date_of_joining !== undefined) updates.date_of_joining = date_of_joining;
     if (status !== undefined) updates.status = status;
     if (password) {
@@ -128,7 +128,7 @@ router.put('/:id', authenticate, requireAdmin, (req, res) => {
     );
 
     const updated = db.prepare(
-      'SELECT id, full_name, phone, email, role, roles, date_of_joining, status, profile_picture FROM users WHERE id = ?'
+      'SELECT id, full_name, phone, email, role, roles, employee_type, date_of_joining, status, profile_picture FROM users WHERE id = ?'
     ).get(req.params.id);
 
     res.json({ message: 'Employee updated successfully', employee: updated });

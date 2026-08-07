@@ -2,6 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 const ROLE_OPTIONS = ['Photographer', 'Cinematographer', 'Editor', 'Drone Pilot', 'Assistant', 'Intern', 'Album Designer', 'Freelancer', 'Other'];
+const EMPLOYEE_TYPE_OPTIONS = [
+  { value: 'other', label: '👤 Employee (manual check-in)' },
+  { value: 'in-house-editor', label: '🏢 In-house Editor (QR + manual check-in)' },
+  { value: 'home-editor', label: '🏠 Home Editor (manual check-in only)' }
+];
 
 export default function AdminEmployees() {
   const { api } = useAuth();
@@ -14,6 +19,7 @@ export default function AdminEmployees() {
   const [selectedIds, setSelectedIds] = useState([]);
   const [form, setForm] = useState({
     full_name: '', phone: '', email: '', password: '', roles: 'Photographer',
+    employee_type: 'other',
     date_of_joining: '', is_admin: false, permission_level: 'Full Access'
   });
 
@@ -82,6 +88,7 @@ export default function AdminEmployees() {
       email: emp.email,
       password: '',
       roles: emp.roles,
+      employee_type: emp.employee_type || 'other',
       date_of_joining: emp.date_of_joining || '',
       is_admin: emp.role === 'Admin',
       permission_level: 'Full Access'
@@ -91,6 +98,7 @@ export default function AdminEmployees() {
   const resetForm = () => {
     setForm({
       full_name: '', phone: '', email: '', password: '', roles: 'Photographer',
+      employee_type: 'other',
       date_of_joining: '', is_admin: false, permission_level: 'Full Access'
     });
   };
@@ -108,6 +116,11 @@ export default function AdminEmployees() {
     setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
+  };
+
+  const getTypeLabel = (type) => {
+    const map = { 'in-house-editor': '🏢 In-house', 'home-editor': '🏠 Home', 'other': '👤' };
+    return map[type] || type || '👤';
   };
 
   if (loading) return <div className="spinner" />;
@@ -151,6 +164,7 @@ export default function AdminEmployees() {
                 }} checked={selectedIds.length === filtered.length && filtered.length > 0} />
               </th>
               <th>Name</th>
+              <th>Type</th>
               <th>Phone</th>
               <th>Email</th>
               <th>Roles</th>
@@ -164,6 +178,7 @@ export default function AdminEmployees() {
               <tr key={emp.id}>
                 <td><input type="checkbox" checked={selectedIds.includes(emp.id)} onChange={() => toggleSelect(emp.id)} /></td>
                 <td style={{ fontWeight: 500 }}>{emp.full_name}</td>
+                <td><span style={{ fontSize: 13 }}>{getTypeLabel(emp.employee_type)}</span></td>
                 <td>{emp.phone}</td>
                 <td style={{ fontSize: 13 }}>{emp.email}</td>
                 <td><span className="badge badge-info">{emp.roles}</span></td>
@@ -207,6 +222,15 @@ export default function AdminEmployees() {
                 <label>Email *</label>
                 <input className="input-field" type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="Email address" />
               </div>
+            </div>
+
+            <div className="input-group">
+              <label>Employee Type</label>
+              <select className="input-field" value={form.employee_type} onChange={e => setForm({ ...form, employee_type: e.target.value })}>
+                {EMPLOYEE_TYPE_OPTIONS.map(o => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
             </div>
 
             <div className="grid grid-2">
