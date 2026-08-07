@@ -71,7 +71,7 @@ function initializeDatabase() {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       user_id INTEGER NOT NULL,
       token TEXT UNIQUE NOT NULL,
-      action TEXT NOT NULL CHECK(action IN ('checkin', 'checkout')),
+      action TEXT NOT NULL CHECK(action IN ('checkin', 'checkout', 'universal')),
       wifi_ssid TEXT NOT NULL,
       wifi_bssid TEXT,
       scanned_at TEXT,
